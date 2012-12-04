@@ -8,6 +8,7 @@ using namespace std;
 class board;
 class square;
 enum piece;
+enum playerColour;
 /*####################################################################################################*/
 
 //Squares
@@ -38,7 +39,7 @@ private:
 };
 /*####################################################################################################*/
 
-//Pieces
+//Enums for pieces and player
 /*----------------------------------------------------------------------------------------------------*/
 enum piece{
 			WHITE_PAWN,
@@ -55,6 +56,11 @@ enum piece{
 			BLACK_QUEEN,
 			BLACK_KING
 };
+enum playerColour{
+			WHITE,
+			BLACK
+};
+
 /*####################################################################################################*/
 
 //Board
@@ -71,6 +77,9 @@ public:
 
 	//Methods
 	//void addCoord(float x, float z, int squareX, int squareZ);
+    bool isValidMove(square from, square to, playerColour myCol);
+	void moveMethod(int fromIVal, int fromJVal, int toIVal, int toJVal, playerColour myCol);
+	void movePiece(square *from, square *to);
 	void printBoard();
 };
 /*####################################################################################################*/

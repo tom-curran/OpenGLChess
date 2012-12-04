@@ -27,11 +27,15 @@ void setViewport(int width, int height);
 
 void camera();
 void keyOperations();
+void mouseClicked(int button, int state, int x, int y);
+void convertMouseCoord(int x, int y);
+void updateSelectedPos(float x, float z);
 
 //Game/Drawing functions:
 void drawSkyBox();
 void drawBoard();
 void drawPieces(board* b);
+void drawMarker();
 
 /*####################################################################################################*/
 
@@ -57,13 +61,16 @@ int		numSquares = 8;
 float	squareSize = ((boardWidth*2)-(boardBorder*2))/(float)numSquares;
 float	pieceHeight = 2.0;
 
+GLUquadric* cylQuad;
+float	iSquareCentre = -5000.0f;
+float	jSquareCentre = -5000.0f;
+
 //Bools
 bool		wireframe=false;
 bool		fullScreen=true;
 
 //?
 int         windowId;
-//GLuint      textureId;
 DWORD		lastTickCount;
 
 //Lights/Light positions
@@ -78,6 +85,10 @@ float viewHeight = 25.0;
 //Controlling
 bool myArray[256] = {false};
 bool* keyStates = myArray;	//For multiple simultaneous keypress
+bool	selected = false;
+int		selectedI = 0;
+int		selectedJ = 0;
+playerColour player = WHITE;
 
 //Position array
 //float
@@ -116,7 +127,7 @@ void setupScene(){
 	glutFullScreen();
 
 	//SKYBOX TEXTURES
-	string texDir = "C:\\Users\\Tom\\documents\\visual studio 2010\\Textures\\rainb\\";
+	string texDir = "C:/Users/Tom/documents/visual studio 2010/Textures/rainb/";
 	glGenTextures(1, &skyBoxBack);
 	textureTGA skyBoxBackTexture(texDir+"back.tga", skyBoxBack);
 	glGenTextures(1, &skyBoxFront);
@@ -129,6 +140,7 @@ void setupScene(){
 	textureTGA skyBoxTopTexture(texDir+"top.tga", skyBoxTop);
 	glGenTextures(1, &skyBoxFloor);
 	textureTGA skyBoxFloorTexture(texDir+"bottom.tga", skyBoxFloor);
+    cylQuad = gluNewQuadric();
 }
 
 void updateScene(){
@@ -170,6 +182,7 @@ void renderScene(){
 		drawSkyBox();
 		drawBoard();
 		drawPieces(&mainBoard);
+        drawMarker();
 	glPopMatrix();
 
 
@@ -215,6 +228,9 @@ void keypress(unsigned char key, int x, int y){
 			glutReshapeWindow(win_width,win_height);
 			glutPositionWindow(50,50);
 		}
+	}
+    else if(key == 'b'){	// 'b' to test move method
+		mainBoard.moveMethod(0,1,0,2, BLACK);
 	}
 	else keyStates[key] = true;	// Otherwise, add to key buffer (for simultaneous keypresses)
 }
@@ -296,6 +312,59 @@ void keyOperations(){
 		yrot -= 2;
 		if (yrot < -360)yrot += 360;
     }
+}
+
+void mouseClicked(int button, int state, int x, int y){
+	//convertMouseCoord(x, y);
+}
+void mouseHover(int x, int y){
+	convertMouseCoord(x, y);
+}
+
+void convertMouseCoord(int x, int y){
+    GLint viewport[4];								// Where The Viewport Values Will Be Stored
+    glGetIntegerv(GL_VIEWPORT, viewport);			// Retrieves The Viewport Values (X, Y, Width, Height)
+    GLdouble modelview[16];							// Where The 16 Doubles Of The Modelview Matrix Are To Be Stored
+    glGetDoublev(GL_MODELVIEW_MATRIX, modelview);	// Retrieve The Modelview Matrix
+    GLdouble projection[16];						// Where The 16 Doubles Of The Projection Matrix Are To Be Stored
+    glGetDoublev(GL_PROJECTION_MATRIX, projection);	// Retrieve The Projection Matrix
+     
+    glLoadIdentity();
+     
+    GLfloat tempx, tempz, tempy;
+    GLdouble posx, posz, posy;
+     
+    tempx = (float)x;
+	tempy = (float)viewport[3] - (float)y;
+     
+    glReadPixels(tempx, tempy, 1, 1, GL_DEPTH_COMPONENT, GL_FLOAT, &tempz);
+    gluUnProject( tempx, tempy, tempz, modelview, projection, viewport, &posx, &posy, &posz);
+	
+	updateSelectedPos(posx, posz);
+
+    //posx = true x coordinate, posy = true y coordinate, posz = true z coordinate
+}
+
+void updateSelectedPos(float x, float z){
+	//
+	float boardLeft = -boardWidth+boardBorder;
+	float boardRight = boardWidth-boardBorder;
+	float boardBack = boardLeft;
+	float boardFront = boardRight;
+
+	if(x < boardRight && x > boardLeft && z < boardFront && z > boardBack){
+		int iBox, jBox;
+		iBox = (x-boardLeft)/squareSize;
+		jBox = (z-boardBack)/squareSize;
+		float centreFirst = boardLeft + (squareSize/2.0);
+		
+		iSquareCentre = centreFirst + (iBox*squareSize);
+		jSquareCentre = centreFirst + (jBox*squareSize);		
+		
+		//cout<<"POSX: "<<x<<", i: "<<iBox<<"; POSZ: "<<z<<", j: "<<jBox<<endl;
+		//cout<<"ISQUARECENTRE: "<<iSquareCentre<<" JSQUARECENTRE: "<<jSquareCentre<<endl;
+	}
+
 }
 
 /*####################################################################################################*/
@@ -515,6 +584,18 @@ void drawPieces(board* b){
 	}
 }
 
+void drawMarker(){
+	glColor3f(1.0f, 0.0f, 0.0f);
+	glPushMatrix();
+		glTranslatef(iSquareCentre, (boardY+0.2), jSquareCentre);
+		glPushMatrix();
+			glRotatef(-90.0, 1.0f, 0.0f, 0.0f);
+			gluCylinder(cylQuad, 4.0, 4.0, 0.3f, 40, 40);
+		glPopMatrix();
+	glPopMatrix();
+	glColor3f(1.0f, 1.0f, 1.0f);
+}
+
 /*####################################################################################################*/
 
 
@@ -543,6 +624,8 @@ int main(int argc, char** argv){
     glutIdleFunc(updateScene);
     glutKeyboardFunc(keypress);
 	glutKeyboardUpFunc(keyReleased);
+    glutMouseFunc(mouseClicked);
+	glutPassiveMotionFunc(mouseHover);
 
     // Setup OpenGL state & scene resources (models, textures etc)
     setupScene();
