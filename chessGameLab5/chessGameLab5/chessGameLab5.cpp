@@ -133,8 +133,8 @@ void setupScene(){
 
 	//SKYBOX TEXTURES
 	//string texDir = "//134.226.32.3//ugrad//tcurran//my documents//visual studio 2010//Textures//rainb//";
-	string texDir = "C:/Users/Tom/documents/visual studio 2010/Textures/rainb/";
-	//string texDir = "Textures/rainb/";
+	//string texDir = "C:/Users/Tom/documents/visual studio 2010/Textures/rainb/";
+	string texDir = "Textures/rainb/";
 	glGenTextures(1, &skyBoxBack);
 	textureTGA skyBoxBackTexture(texDir+"back.tga", skyBoxBack);
 	glGenTextures(1, &skyBoxFront);
