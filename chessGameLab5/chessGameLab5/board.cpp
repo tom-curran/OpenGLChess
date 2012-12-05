@@ -2,6 +2,7 @@
 
 //BOARD
 /*----------------------------------------------------------------------------------------------------*/
+
 //Board constructor
 board::board(){}
 board::board(float startX, float startZ, float squareWidth){
@@ -24,7 +25,7 @@ board::~board(){}
 
 //Check if move from square to square is valid (checks piece on from square for rules, and to ensure to square is empty or is takeable)
 bool board::isValidMove(square from, square to, playerColour myCol){
-	
+	cout<<"MOVING: ["<<from.iVal<<","<<from.jVal<<"] to ["<<to.iVal<<","<<to.jVal<<"]"<<endl;
 	//Two pieces:
 	piece fromPiece = from.currentP;
 	piece destPiece = to.currentP;
@@ -42,21 +43,97 @@ bool board::isValidMove(square from, square to, playerColour myCol){
 
 	//CASTLING?
 	//EN PASSANT?
-
+	if(pieceMoveRules(from, to)) cout<<"VALID"<<endl;
 	//Valid move otherwise, as long as piece can move to that square
-	if(destPiece == EMPTY) return true;
+	return pieceMoveRules(from, to);
+}
 
-	switch(fromPiece){
-	case EMPTY:
-		return false;
-		break;
-	case WHITE_PAWN:
-		return false;
-		break;
-	default:
-		return false;
-		break;
+bool board::pieceMoveRules(square from, square to){
+	piece thisPiece = from.currentP;
+	
+	//Movement
+	int iDelta = to.iVal - from.iVal;
+	int jDelta = to.jVal - from.jVal;
+	//Direction
+	bool forwards = false;
+	if(thisPiece > EMPTY){
+		forwards = jDelta > 0;	//BLACK
 	}
+	else{
+		forwards = jDelta < 0;	//WHITE
+		jDelta *= -1;
+	}
+
+	//Null move not allowed
+	if(iDelta == jDelta == 0) return false;
+
+	switch(thisPiece){
+
+		//Pawns:
+		case BLACK_PAWN:
+		case WHITE_PAWN:
+
+			//Can't move backwards, can't move more than one space
+			if(!forwards) return false;
+
+			//**If at starting position can move forwards 2**
+			if(thisPiece == BLACK_PAWN && from.jVal == 1 && jDelta == 2 && iDelta == 0) return true;
+			if(thisPiece == WHITE_PAWN && from.jVal == 6 && jDelta == 2 && iDelta == 0) return true;
+			//Otherwise can only move one space
+			if(jDelta > 1) return false;
+
+			//Allow to move forward one and not to the side
+			if(jDelta == 1 && iDelta == 0) return true;
+			//Allow to move one forwards and one to the side if taking a piece
+			if(jDelta == 1 && (iDelta == 1 || iDelta == -1) && to.currentP != EMPTY) return true;
+			//Otherwise, not allowed
+			else return false;
+			break;
+
+		//Rooks:
+		case BLACK_ROOK:
+		case WHITE_ROOK:
+			if(jDelta != 0) return iDelta == 0;	//If moves on the j axis, cannot move on i axis as well
+			else return false;					//Otherwise there is no j axis movement, can move any amount on i axis
+			break;
+
+		//Knights:
+		case BLACK_KNIGHT:
+		case WHITE_KNIGHT:
+			if(jDelta == 1 && (iDelta == 2 || iDelta == -2)) return true;
+			else if((iDelta == 1 || iDelta == -1) && jDelta == 2) return true;
+			else return false;	// Fuck knights
+			break;
+
+		//Bishops:
+		case BLACK_BISHOP:
+		case WHITE_BISHOP:
+			if(jDelta == iDelta || jDelta == -iDelta) return true;
+			else return false;
+			break;
+
+		//Queens:
+		case BLACK_QUEEN:
+		case WHITE_QUEEN:
+			if(jDelta == iDelta || jDelta == -iDelta) return true;	//Bishop motion
+			else if(jDelta != 0) return iDelta == 0;				//Rook motion
+			else return false;
+			break;
+
+		//Kings:
+		case BLACK_KING:
+		case WHITE_KING:
+			if(jDelta > 1 || iDelta > 1 || iDelta < -1) return false;
+			else return true;
+			break;
+		
+		//Shouldn't be possible
+		default:
+			cout<<"\nWAT\n"<<endl;
+			return false;
+			break;
+	}
+	//return true;
 }
 
 void board::moveMethod(int fromIVal, int fromJVal, int toIVal, int toJVal, playerColour myCol){
@@ -79,6 +156,7 @@ void board::moveMethod(int fromIVal, int fromJVal, int toIVal, int toJVal, playe
 //		from->currentP = EMPTY;
 //	}
 //}
+
 
 void board::printBoard(){
 	using namespace std;

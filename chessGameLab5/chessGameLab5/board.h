@@ -56,11 +56,11 @@ enum piece{
 			BLACK_QUEEN,
 			BLACK_KING
 };
+
 enum playerColour{
 			WHITE,
 			BLACK
 };
-
 /*####################################################################################################*/
 
 //Board
@@ -76,8 +76,9 @@ public:
 	~board();
 
 	//Methods
-	//void addCoord(float x, float z, int squareX, int squareZ);
-    bool isValidMove(square from, square to, playerColour myCol);
+	//void addCoord(float x, float z, int squareX, int squareZ);	
+	bool isValidMove(square from, square to, playerColour myCol);
+	bool pieceMoveRules(square from, square to);
 	void moveMethod(int fromIVal, int fromJVal, int toIVal, int toJVal, playerColour myCol);
 	void movePiece(square *from, square *to);
 	void printBoard();

@@ -28,8 +28,8 @@ void setViewport(int width, int height);
 void camera();
 void keyOperations();
 void mouseClicked(int button, int state, int x, int y);
-void convertMouseCoord(int x, int y);
-void updateSelectedPos(float x, float z);
+void convertMouseCoord(int x, int y, bool click);
+void updateSelectedPos(float x, float z, bool click);
 
 //Game/Drawing functions:
 void drawSkyBox();
@@ -62,8 +62,8 @@ float	squareSize = ((boardWidth*2)-(boardBorder*2))/(float)numSquares;
 float	pieceHeight = 2.0;
 
 GLUquadric* cylQuad;
-float	iSquareCentre = -5000.0f;
-float	jSquareCentre = -5000.0f;
+float	iSquareCentre = NULL;
+float	jSquareCentre = NULL;
 
 //Bools
 bool		wireframe=false;
@@ -71,6 +71,7 @@ bool		fullScreen=true;
 
 //?
 int         windowId;
+//GLuint      textureId;
 DWORD		lastTickCount;
 
 //Lights/Light positions
@@ -83,12 +84,17 @@ float xpos = 0, ypos = 0, zpos = 0, xrot = 0, yrot = 0, angle=0.0;
 float viewHeight = 25.0;
 
 //Controlling
-bool myArray[256] = {false};
-bool* keyStates = myArray;	//For multiple simultaneous keypress
+bool	myArray[256] = {false};
+bool*	keyStates = myArray;	//For multiple simultaneous keypress
+
 bool	selected = false;
-int		selectedI = 0;
-int		selectedJ = 0;
+int		iSelected = -1;
+int		jSelected = -1;
+int		iHover = -1;
+int		jHover = -1;
+
 playerColour player = WHITE;
+//bool	squareSelected = false;
 
 //Position array
 //float
@@ -140,7 +146,8 @@ void setupScene(){
 	textureTGA skyBoxTopTexture(texDir+"top.tga", skyBoxTop);
 	glGenTextures(1, &skyBoxFloor);
 	textureTGA skyBoxFloorTexture(texDir+"bottom.tga", skyBoxFloor);
-    cylQuad = gluNewQuadric();
+
+	cylQuad = gluNewQuadric();
 }
 
 void updateScene(){
@@ -182,7 +189,7 @@ void renderScene(){
 		drawSkyBox();
 		drawBoard();
 		drawPieces(&mainBoard);
-        drawMarker();
+		drawMarker();
 	glPopMatrix();
 
 
@@ -229,7 +236,7 @@ void keypress(unsigned char key, int x, int y){
 			glutPositionWindow(50,50);
 		}
 	}
-    else if(key == 'b'){	// 'b' to test move method
+	else if(key == 'b'){	// 'b' to test move method
 		mainBoard.moveMethod(0,1,0,2, BLACK);
 	}
 	else keyStates[key] = true;	// Otherwise, add to key buffer (for simultaneous keypresses)
@@ -315,13 +322,14 @@ void keyOperations(){
 }
 
 void mouseClicked(int button, int state, int x, int y){
-	//convertMouseCoord(x, y);
+	if(state == GLUT_DOWN) convertMouseCoord(x, y, true);
 }
 void mouseHover(int x, int y){
-	convertMouseCoord(x, y);
+	convertMouseCoord(x, y, false);
+	//convertMouseCoord(x, y);
 }
 
-void convertMouseCoord(int x, int y){
+void convertMouseCoord(int x, int y, bool click){
     GLint viewport[4];								// Where The Viewport Values Will Be Stored
     glGetIntegerv(GL_VIEWPORT, viewport);			// Retrieves The Viewport Values (X, Y, Width, Height)
     GLdouble modelview[16];							// Where The 16 Doubles Of The Modelview Matrix Are To Be Stored
@@ -340,12 +348,16 @@ void convertMouseCoord(int x, int y){
     glReadPixels(tempx, tempy, 1, 1, GL_DEPTH_COMPONENT, GL_FLOAT, &tempz);
     gluUnProject( tempx, tempy, tempz, modelview, projection, viewport, &posx, &posy, &posz);
 	
-	updateSelectedPos(posx, posz);
+	//updateSelectedPos(posx, posz);
+	updateSelectedPos(posx, posz, click);
+
+	//if(click) select()
+	//else hoverColour()
 
     //posx = true x coordinate, posy = true y coordinate, posz = true z coordinate
 }
 
-void updateSelectedPos(float x, float z){
+void updateSelectedPos(float x, float z, bool click){
 	//
 	float boardLeft = -boardWidth+boardBorder;
 	float boardRight = boardWidth-boardBorder;
@@ -359,13 +371,32 @@ void updateSelectedPos(float x, float z){
 		float centreFirst = boardLeft + (squareSize/2.0);
 		
 		iSquareCentre = centreFirst + (iBox*squareSize);
-		jSquareCentre = centreFirst + (jBox*squareSize);		
+		jSquareCentre = centreFirst + (jBox*squareSize);
+
+		iHover = iBox;
+		jHover = jBox;
+		
+		if(click){
+			if(!selected){
+				selected = true;
+				iSelected = iBox;
+				jSelected = jBox;
+			}
+			else{
+				selected = false;
+				iSelected = NULL;
+				jSelected = NULL;
+				if(player == WHITE) player = BLACK;
+				else player = WHITE;
+			}
+		}
+		
 		
 		//cout<<"POSX: "<<x<<", i: "<<iBox<<"; POSZ: "<<z<<", j: "<<jBox<<endl;
 		//cout<<"ISQUARECENTRE: "<<iSquareCentre<<" JSQUARECENTRE: "<<jSquareCentre<<endl;
 	}
-
 }
+
 
 /*####################################################################################################*/
 
@@ -585,15 +616,30 @@ void drawPieces(board* b){
 }
 
 void drawMarker(){
-	glColor3f(1.0f, 0.0f, 0.0f);
-	glPushMatrix();
-		glTranslatef(iSquareCentre, (boardY+0.2), jSquareCentre);
+	if(iSquareCentre != NULL && jSquareCentre != NULL && iHover != -1 && jHover != -1){
+		
+		//Green marker if on your piece (when no piece yet selected), red marker otherwise
+		square test = *(mainBoard.boardArray[iHover][jHover]);
+		if(!selected){
+			if((test.currentP < EMPTY && player == WHITE) || (test.currentP > EMPTY && player == BLACK)) glColor3f(0.0f, 1.0f, 0.0f);
+			else glColor3f(1.0f, 0.0f, 0.0f);
+		}
+		else{
+			//Green marker when on valid point to move to
+			if(mainBoard.isValidMove(*(mainBoard.boardArray[iSelected][jSelected]), *(mainBoard.boardArray[iHover][jHover]), player)) glColor3f(0.0f, 1.0f, 0.0f);
+			else glColor3f(1.0f, 0.0f, 0.0f);
+		}
+		cout<<selected<<endl;
+
 		glPushMatrix();
-			glRotatef(-90.0, 1.0f, 0.0f, 0.0f);
-			gluCylinder(cylQuad, 4.0, 4.0, 0.3f, 40, 40);
+			glTranslatef(iSquareCentre, (boardY+0.2), jSquareCentre);
+			glPushMatrix();
+				glRotatef(-90.0, 1.0f, 0.0f, 0.0f);
+				gluCylinder(cylQuad, 4.0, 4.0, 0.3f, 40, 40);
+			glPopMatrix();
 		glPopMatrix();
-	glPopMatrix();
-	glColor3f(1.0f, 1.0f, 1.0f);
+		glColor3f(1.0f, 1.0f, 1.0f);
+	}
 }
 
 /*####################################################################################################*/
@@ -624,7 +670,8 @@ int main(int argc, char** argv){
     glutIdleFunc(updateScene);
     glutKeyboardFunc(keypress);
 	glutKeyboardUpFunc(keyReleased);
-    glutMouseFunc(mouseClicked);
+	glutMouseFunc(mouseClicked);
+	
 	glutPassiveMotionFunc(mouseHover);
 
     // Setup OpenGL state & scene resources (models, textures etc)
