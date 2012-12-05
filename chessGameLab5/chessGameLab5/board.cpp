@@ -61,7 +61,8 @@ bool board::pieceMoveRules(square from, square to){
 	}
 	else{
 		forwards = jDelta < 0;	//WHITE
-		jDelta *= -1;
+		if(forwards) jDelta *= -1;
+		//cout<<jDelta<<endl;
 	}
 
 	//Null move not allowed
@@ -76,9 +77,19 @@ bool board::pieceMoveRules(square from, square to){
 			//Can't move backwards, can't move more than one space
 			if(!forwards) return false;
 
+			//Starting double move onto empty square:
+			if(jDelta == 2 && iDelta == 0 && to.currentP == EMPTY){
+				if(thisPiece == BLACK_PAWN){	//jDelta was positive
+					if(from.jVal == 1 && boardArray[from.iVal][2]->currentP == EMPTY) return true;	//If square in between is empty
+				}
+				else{
+					if(from.jVal == 6 && boardArray[from.iVal][5]->currentP == EMPTY) return true;	//""
+				}
+			}
+
 			//**If at starting position can move forwards 2**
-			if(thisPiece == BLACK_PAWN && from.jVal == 1 && jDelta == 2 && iDelta == 0 && to.currentP == EMPTY) return true;
-			if(thisPiece == WHITE_PAWN && from.jVal == 6 && jDelta == 2 && iDelta == 0 && to.currentP == EMPTY) return true;
+			//if(((thisPiece == BLACK_PAWN && from.jVal == 1) || (thisPiece == WHITE_PAWN && from.jVal == 6)) && jDelta == 2 && iDelta == 0 && to.currentP == EMPTY) return checkLineOfSight(from, to);
+			//if(thisPiece == WHITE_PAWN && from.jVal == 6 && jDelta == 2 && iDelta == 0 && to.currentP == EMPTY) return checkLineOfSight(from, to);
 			//Otherwise can only move one space
 			if(jDelta > 1) return false;
 
@@ -107,9 +118,14 @@ bool board::pieceMoveRules(square from, square to){
 		//Knights:
 		case BLACK_KNIGHT:
 		case WHITE_KNIGHT:
+			//cout<<"GOT HERE"<<endl;
 			if(jDelta == 1 && (iDelta == 2 || iDelta == -2)) return true;
 			else if((iDelta == 1 || iDelta == -1) && jDelta == 2) return true;
-			else return false;
+			
+			else {
+				//cout<<"??? "<<jDelta<<" "<<iDelta<<endl;
+				return false;
+			}
 			break;
 
 		//Bishops:
@@ -145,11 +161,27 @@ bool board::pieceMoveRules(square from, square to){
 		
 		//Shouldn't be possible
 		default:
-			cout<<"\nWAT\n"<<endl;
 			return false;
 			break;
 	}
 	//return true;
+}
+
+bool board::checkLineOfSight(square from, square to){
+	int iFrom = from.iVal;
+	int jFrom = from.jVal;
+	int iTo = to.iVal;
+	int jTo = to.jVal;
+
+	if(iTo == iFrom || jTo == jFrom){
+		//Straight line movement, left/right or forward/backward
+		return true;
+	}
+	else if(iTo - iFrom == jTo - jFrom || iFrom - iTo == jTo - jFrom){
+		//diagonal movement
+		return true;
+	}
+	else return false;
 }
 
 bool board::moveMethod(int fromIVal, int fromJVal, int toIVal, int toJVal, playerColour myCol){

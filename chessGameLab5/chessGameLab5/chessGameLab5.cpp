@@ -71,6 +71,7 @@ float	jSelectedCoords = NULL;
 //Bools
 bool		wireframe=false;
 bool		fullScreen=true;
+bool		disco = false;
 
 //?
 int         windowId;
@@ -83,7 +84,7 @@ GLfloat left_light_position[] = {1,0,-1, 1.0};
 GLfloat right_light_position[] = {-1,0,-1, 1.0};
 
 //Camera
-float xpos = 0, ypos = 0, zpos = 0, xrot = 0, yrot = 0, angle=0.0;
+float xpos = 0, ypos = 0, zpos = 100, xrot = 15, yrot = 0, angle=0.0;
 float viewHeight = 25.0;
 
 //Controlling
@@ -99,6 +100,7 @@ int		jHover = -1;
 playerColour player = WHITE;
 
 //Skybox textures
+string		texDir = "Textures/rainb/";
 GLuint		skyBoxBack;
 GLuint		skyBoxFront;
 GLuint		skyBoxLeft;
@@ -131,10 +133,7 @@ void setupScene(){
 
 	glutFullScreen();
 
-	//SKYBOX TEXTURES
-	//string texDir = "//134.226.32.3//ugrad//tcurran//my documents//visual studio 2010//Textures//rainb//";
-	//string texDir = "C:/Users/Tom/documents/visual studio 2010/Textures/rainb/";
-	string texDir = "Textures/rainb/";
+	//SKYBOX TEXTURES	
 	glGenTextures(1, &skyBoxBack);
 	textureTGA skyBoxBackTexture(texDir+"back.tga", skyBoxBack);
 	glGenTextures(1, &skyBoxFront);
@@ -159,6 +158,17 @@ void updateScene(){
 	lastTickCount=timeGetTime();
 
 	// Do any other updates here
+	//DISCO
+	if(disco){
+		int	flicker=5;
+		if(lastTickCount % flicker ==0){
+			wireframe=!wireframe;
+			if(wireframe){
+				glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+			}
+			else glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+		}
+	}
 	
 	// Draw the next frame
     glutPostRedisplay();
@@ -225,8 +235,44 @@ void keypress(unsigned char key, int x, int y){
 			glutPositionWindow(50,50);
 		}
 	}
-	else if(key == 'b'){	// 'b' to test move method
-		mainBoard.moveMethod(0,1,0,2, BLACK);
+	else if(key == '.'){
+		disco = !disco;
+		if(disco){
+			PlaySound(L"Sound/BangkokRemix.wav", NULL, SND_ASYNC|SND_FILENAME|SND_LOOP);
+			texDir = "Textures/tron/";
+			glGenTextures(1, &skyBoxBack);
+			textureTGA skyBoxBackTexture(texDir+"back.tga", skyBoxBack);
+			glGenTextures(1, &skyBoxFront);
+			textureTGA skyBoxFrontPlasterTexture(texDir+"front.tga", skyBoxFront);
+			glGenTextures(1, &skyBoxLeft);
+			textureTGA skyBoxLeftTexture(texDir+"left.tga", skyBoxLeft);
+			glGenTextures(1, &skyBoxRight);
+			textureTGA skyBoxRightTexture(texDir+"right.tga", skyBoxRight);
+			glGenTextures(1, &skyBoxTop);
+			textureTGA skyBoxTopTexture(texDir+"top.tga", skyBoxTop);
+			glGenTextures(1, &skyBoxFloor);
+			textureTGA skyBoxFloorTexture(texDir+"bottom.tga", skyBoxFloor);
+		}
+		else{
+			PlaySound(L"Sound/OneNightInBangkok.wav", NULL, SND_ASYNC|SND_FILENAME|SND_LOOP);
+			texDir = "Textures/rainb/";
+			glGenTextures(1, &skyBoxBack);
+			textureTGA skyBoxBackTexture(texDir+"back.tga", skyBoxBack);
+			glGenTextures(1, &skyBoxFront);
+			textureTGA skyBoxFrontPlasterTexture(texDir+"front.tga", skyBoxFront);
+			glGenTextures(1, &skyBoxLeft);
+			textureTGA skyBoxLeftTexture(texDir+"left.tga", skyBoxLeft);
+			glGenTextures(1, &skyBoxRight);
+			textureTGA skyBoxRightTexture(texDir+"right.tga", skyBoxRight);
+			glGenTextures(1, &skyBoxTop);
+			textureTGA skyBoxTopTexture(texDir+"top.tga", skyBoxTop);
+			glGenTextures(1, &skyBoxFloor);
+			textureTGA skyBoxFloorTexture(texDir+"bottom.tga", skyBoxFloor);
+		}
+			
+	}
+	else if(key == 'm'){	// Music
+		if(!disco) PlaySound(L"Sound/OneNightInBangkok.wav", NULL, SND_ASYNC|SND_FILENAME|SND_LOOP);
 	}
 	else keyStates[key] = true;	// Otherwise, add to key buffer (for simultaneous keypresses)
 }
@@ -674,7 +720,7 @@ int main(int argc, char** argv){
 
 	// Initialise OpenGL
     glutInit(&argc, argv); 
-
+	
     // Set window position, size & create window
     glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE | GLUT_DEPTH);
     glutInitWindowPosition(50,50);
@@ -696,6 +742,9 @@ int main(int argc, char** argv){
 
     // Setup OpenGL state & scene resources (models, textures etc)
     setupScene();
+
+	//Sound
+	//PlaySound(L"Sound/OneNightInBangkok.wav", NULL, SND_ASYNC|SND_FILENAME|SND_LOOP);
 
     // Show window & start update loop
     glutMainLoop();
