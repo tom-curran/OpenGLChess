@@ -79,8 +79,8 @@ public:
 	//void addCoord(float x, float z, int squareX, int squareZ);	
 	bool isValidMove(square from, square to, playerColour myCol);
 	bool pieceMoveRules(square from, square to);
-	void moveMethod(int fromIVal, int fromJVal, int toIVal, int toJVal, playerColour myCol);
-	void movePiece(square *from, square *to);
+	bool moveMethod(int fromIVal, int fromJVal, int toIVal, int toJVal, playerColour myCol);
+	//void movePiece(square *from, square *to);
 	void printBoard();
 };
 /*####################################################################################################*/

@@ -28,6 +28,7 @@ void setViewport(int width, int height);
 void camera();
 void keyOperations();
 void mouseClicked(int button, int state, int x, int y);
+void mouseWheeled(int wheel, int direction, int x, int y);
 void convertMouseCoord(int x, int y, bool click);
 void updateSelectedPos(float x, float z, bool click);
 
@@ -64,6 +65,8 @@ float	pieceHeight = 2.0;
 GLUquadric* cylQuad;
 float	iSquareCentre = NULL;
 float	jSquareCentre = NULL;
+float	iSelectedCoords = NULL;
+float	jSelectedCoords = NULL;
 
 //Bools
 bool		wireframe=false;
@@ -94,10 +97,6 @@ int		iHover = -1;
 int		jHover = -1;
 
 playerColour player = WHITE;
-//bool	squareSelected = false;
-
-//Position array
-//float
 
 //Skybox textures
 GLuint		skyBoxBack;
@@ -133,7 +132,9 @@ void setupScene(){
 	glutFullScreen();
 
 	//SKYBOX TEXTURES
+	//string texDir = "//134.226.32.3//ugrad//tcurran//my documents//visual studio 2010//Textures//rainb//";
 	string texDir = "C:/Users/Tom/documents/visual studio 2010/Textures/rainb/";
+	//string texDir = "Textures/rainb/";
 	glGenTextures(1, &skyBoxBack);
 	textureTGA skyBoxBackTexture(texDir+"back.tga", skyBoxBack);
 	glGenTextures(1, &skyBoxFront);
@@ -178,25 +179,13 @@ void renderScene(){
 
 	// Set view position & direction
 	camera();
-	// (Camera at (0,0,5) looking down the negative Z-axis)
-	//gluLookAt(0,1,5,  0,0,-1,  0,1,0);
-
-	//glEnable(GL_TEXTURE_2D);
 	
-	//glColor3f(1.0f,1.0f,0.0f);
-
 	glPushMatrix();
 		drawSkyBox();
 		drawBoard();
 		drawPieces(&mainBoard);
 		drawMarker();
-	glPopMatrix();
-
-
-	//glDisable(GL_TEXTURE_2D);
-	//glPushMatrix();
-	//glPopMatrix();
-   
+	glPopMatrix();   
  
     // Swap double buffer for flicker-free animation
     glutSwapBuffers();
@@ -322,11 +311,31 @@ void keyOperations(){
 }
 
 void mouseClicked(int button, int state, int x, int y){
-	if(state == GLUT_DOWN) convertMouseCoord(x, y, true);
+	//Left-click to select/move piece
+	if(button == GLUT_LEFT_BUTTON && state == GLUT_DOWN) convertMouseCoord(x, y, true);
+	//Right-click to deselect currently selected piece
+	else if(button == GLUT_RIGHT_BUTTON && state == GLUT_DOWN && selected){
+		selected = false;
+		iSelected = NULL;
+		jSelected = NULL;
+		iSelectedCoords = NULL;
+		jSelectedCoords = NULL;
+	}
 }
 void mouseHover(int x, int y){
+	//Hovering over squares updates position/colour of selection cylinder
 	convertMouseCoord(x, y, false);
-	//convertMouseCoord(x, y);
+}
+void mouseWheeled(int wheel, int direction, int x, int y){
+	//Wheel up/down does same thing as keys 'o' and 'l' (but slower)
+	if(direction == 1){
+		//UP
+		if (xrot-1 > -70) xrot -= 1;
+	}
+	else{
+		//DOWN
+		if (xrot+1 < 70) xrot += 1;
+	}
 }
 
 void convertMouseCoord(int x, int y, bool click){
@@ -340,21 +349,15 @@ void convertMouseCoord(int x, int y, bool click){
     glLoadIdentity();
      
     GLfloat tempx, tempz, tempy;
-    GLdouble posx, posz, posy;
+    GLdouble posx, posz, posy;	//These will hold 3D position of mouse cursor
      
     tempx = (float)x;
 	tempy = (float)viewport[3] - (float)y;
      
     glReadPixels(tempx, tempy, 1, 1, GL_DEPTH_COMPONENT, GL_FLOAT, &tempz);
-    gluUnProject( tempx, tempy, tempz, modelview, projection, viewport, &posx, &posy, &posz);
+    gluUnProject(tempx, tempy, tempz, modelview, projection, viewport, &posx, &posy, &posz);
 	
-	//updateSelectedPos(posx, posz);
 	updateSelectedPos(posx, posz, click);
-
-	//if(click) select()
-	//else hoverColour()
-
-    //posx = true x coordinate, posy = true y coordinate, posz = true z coordinate
 }
 
 void updateSelectedPos(float x, float z, bool click){
@@ -376,24 +379,29 @@ void updateSelectedPos(float x, float z, bool click){
 		iHover = iBox;
 		jHover = jBox;
 		
+		//Ensure can only select our own piece
+		bool ourPiece = (mainBoard.boardArray[iBox][jBox]->currentP > EMPTY && player == BLACK) || (mainBoard.boardArray[iBox][jBox]->currentP < EMPTY && player == WHITE);
+
 		if(click){
-			if(!selected){
+			if(!selected && ourPiece){
 				selected = true;
 				iSelected = iBox;
 				jSelected = jBox;
+				iSelectedCoords = centreFirst + (iBox*squareSize);
+				jSelectedCoords = centreFirst + (jBox*squareSize);
 			}
-			else{
-				selected = false;
-				iSelected = NULL;
-				jSelected = NULL;
-				if(player == WHITE) player = BLACK;
-				else player = WHITE;
+			else if(selected){				
+				if(mainBoard.moveMethod(iSelected, jSelected, iHover, jHover, player)){
+					selected = false;
+					iSelected = NULL;
+					jSelected = NULL;
+					iSelectedCoords = NULL;
+					jSelectedCoords = NULL;
+					if(player == WHITE) player = BLACK;
+					else player = WHITE;
+				}				
 			}
 		}
-		
-		
-		//cout<<"POSX: "<<x<<", i: "<<iBox<<"; POSZ: "<<z<<", j: "<<jBox<<endl;
-		//cout<<"ISQUARECENTRE: "<<iSquareCentre<<" JSQUARECENTRE: "<<jSquareCentre<<endl;
 	}
 }
 
@@ -616,6 +624,17 @@ void drawPieces(board* b){
 }
 
 void drawMarker(){
+	if(selected && iSelectedCoords != NULL && jSelectedCoords != NULL){
+		glColor3f(0.0f, 0.0f, 1.0f);
+		glPushMatrix();
+			glTranslatef(iSelectedCoords, (boardY+0.2), jSelectedCoords);
+			glPushMatrix();
+				glRotatef(-90.0, 1.0f, 0.0f, 0.0f);
+				gluCylinder(cylQuad, 4.0, 4.0, 0.3f, 40, 40);
+			glPopMatrix();
+		glPopMatrix();
+	}
+
 	if(iSquareCentre != NULL && jSquareCentre != NULL && iHover != -1 && jHover != -1){
 		
 		//Green marker if on your piece (when no piece yet selected), red marker otherwise
@@ -629,7 +648,6 @@ void drawMarker(){
 			if(mainBoard.isValidMove(*(mainBoard.boardArray[iSelected][jSelected]), *(mainBoard.boardArray[iHover][jHover]), player)) glColor3f(0.0f, 1.0f, 0.0f);
 			else glColor3f(1.0f, 0.0f, 0.0f);
 		}
-		cout<<selected<<endl;
 
 		glPushMatrix();
 			glTranslatef(iSquareCentre, (boardY+0.2), jSquareCentre);
@@ -668,9 +686,11 @@ int main(int argc, char** argv){
     glutReshapeFunc(setViewport);
     glutDisplayFunc(renderScene);
     glutIdleFunc(updateScene);
+
     glutKeyboardFunc(keypress);
 	glutKeyboardUpFunc(keyReleased);
 	glutMouseFunc(mouseClicked);
+	glutMouseWheelFunc(mouseWheeled);
 	
 	glutPassiveMotionFunc(mouseHover);
 

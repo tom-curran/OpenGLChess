@@ -25,13 +25,13 @@ board::~board(){}
 
 //Check if move from square to square is valid (checks piece on from square for rules, and to ensure to square is empty or is takeable)
 bool board::isValidMove(square from, square to, playerColour myCol){
-	cout<<"MOVING: ["<<from.iVal<<","<<from.jVal<<"] to ["<<to.iVal<<","<<to.jVal<<"]"<<endl;
+
 	//Two pieces:
 	piece fromPiece = from.currentP;
 	piece destPiece = to.currentP;
 
 	//No piece at starting square
-	if(fromPiece == EMPTY) return false;	
+	if(fromPiece == EMPTY) return false;
 
 	//If it isn't our piece, false
 	if((fromPiece > EMPTY && myCol == WHITE) || (fromPiece < EMPTY && myCol == BLACK)) return false;
@@ -43,7 +43,7 @@ bool board::isValidMove(square from, square to, playerColour myCol){
 
 	//CASTLING?
 	//EN PASSANT?
-	if(pieceMoveRules(from, to)) cout<<"VALID"<<endl;
+
 	//Valid move otherwise, as long as piece can move to that square
 	return pieceMoveRules(from, to);
 }
@@ -65,7 +65,7 @@ bool board::pieceMoveRules(square from, square to){
 	}
 
 	//Null move not allowed
-	if(iDelta == jDelta == 0) return false;
+	if(iDelta == 0 && jDelta == 0) return false;
 
 	switch(thisPiece){
 
@@ -77,13 +77,13 @@ bool board::pieceMoveRules(square from, square to){
 			if(!forwards) return false;
 
 			//**If at starting position can move forwards 2**
-			if(thisPiece == BLACK_PAWN && from.jVal == 1 && jDelta == 2 && iDelta == 0) return true;
-			if(thisPiece == WHITE_PAWN && from.jVal == 6 && jDelta == 2 && iDelta == 0) return true;
+			if(thisPiece == BLACK_PAWN && from.jVal == 1 && jDelta == 2 && iDelta == 0 && to.currentP == EMPTY) return true;
+			if(thisPiece == WHITE_PAWN && from.jVal == 6 && jDelta == 2 && iDelta == 0 && to.currentP == EMPTY) return true;
 			//Otherwise can only move one space
 			if(jDelta > 1) return false;
 
-			//Allow to move forward one and not to the side
-			if(jDelta == 1 && iDelta == 0) return true;
+			//Allow to move forward one and not to the side if into empty square
+			if(jDelta == 1 && iDelta == 0 && to.currentP == EMPTY) return true;
 			//Allow to move one forwards and one to the side if taking a piece
 			if(jDelta == 1 && (iDelta == 1 || iDelta == -1) && to.currentP != EMPTY) return true;
 			//Otherwise, not allowed
@@ -93,8 +93,15 @@ bool board::pieceMoveRules(square from, square to){
 		//Rooks:
 		case BLACK_ROOK:
 		case WHITE_ROOK:
-			if(jDelta != 0) return iDelta == 0;	//If moves on the j axis, cannot move on i axis as well
-			else return false;					//Otherwise there is no j axis movement, can move any amount on i axis
+			if(jDelta != 0){
+				//CHECK LINE OF SIGHT
+				return iDelta == 0;	//If moves on the j axis, cannot move on i axis as well
+			}
+			else if(iDelta != 0){
+				//CHECK LINE OF SIGHT
+				return true;
+			}
+			else return false;
 			break;
 
 		//Knights:
@@ -102,21 +109,30 @@ bool board::pieceMoveRules(square from, square to){
 		case WHITE_KNIGHT:
 			if(jDelta == 1 && (iDelta == 2 || iDelta == -2)) return true;
 			else if((iDelta == 1 || iDelta == -1) && jDelta == 2) return true;
-			else return false;	// Fuck knights
+			else return false;
 			break;
 
 		//Bishops:
 		case BLACK_BISHOP:
 		case WHITE_BISHOP:
-			if(jDelta == iDelta || jDelta == -iDelta) return true;
+			if(jDelta == iDelta || jDelta == -iDelta){
+				//CHECK LINE OF SIGHT
+				return true;
+			}
 			else return false;
 			break;
 
 		//Queens:
 		case BLACK_QUEEN:
 		case WHITE_QUEEN:
-			if(jDelta == iDelta || jDelta == -iDelta) return true;	//Bishop motion
-			else if(jDelta != 0) return iDelta == 0;				//Rook motion
+			if(jDelta == iDelta || jDelta == -iDelta){
+				//CHECK LINE OF SIGHT
+				return true;	//Bishop motion
+			}
+			else if(jDelta != 0){
+				//CHECK LINE OF SIGHT
+				return iDelta == 0;				//Rook motion
+			}
 			else return false;
 			break;
 
@@ -136,14 +152,16 @@ bool board::pieceMoveRules(square from, square to){
 	//return true;
 }
 
-void board::moveMethod(int fromIVal, int fromJVal, int toIVal, int toJVal, playerColour myCol){
+bool board::moveMethod(int fromIVal, int fromJVal, int toIVal, int toJVal, playerColour myCol){
 	square from = *boardArray[fromIVal][fromJVal];
 	square to = *boardArray[toIVal][toJVal];
 
 	if(isValidMove(from, to, myCol)){
 		boardArray[toIVal][toJVal]->currentP = boardArray[fromIVal][fromJVal]->currentP;
 		boardArray[fromIVal][fromJVal]->currentP = EMPTY;
+		return true;
 	}
+	else return false;
 }
 
 //Function to move piece across board:
