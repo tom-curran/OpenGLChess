@@ -7,6 +7,7 @@
 
 //#include "model3DS.h" // 3DS model support
 #include "textureTGA.h" // TGA support
+#include "textureBMP.h"
 
 #include "board.h"
 
@@ -37,6 +38,8 @@ void drawSkyBox();
 void drawBoard();
 void drawPieces(board* b);
 void drawMarker();
+void discoSwitch();
+void resetGame();
 
 /*####################################################################################################*/
 
@@ -48,7 +51,8 @@ void drawMarker();
 int		win_width=640;
 int		win_height=480;
 float	piVal = 3.141592654f;
-float	skyboxSize = 800.0f;
+float	skyboxSize = 2000.0f;
+float	startXZ;
 
 
 //For board drawing:
@@ -69,8 +73,11 @@ float	iSelectedCoords = NULL;
 float	jSelectedCoords = NULL;
 
 //Bools
+bool		inMenu = true;
+bool		inOptions = false;
 bool		wireframe=false;
 bool		fullScreen=true;
+bool		music = false;
 bool		disco = false;
 
 //?
@@ -99,8 +106,11 @@ int		jHover = -1;
 
 playerColour player = WHITE;
 
+//Menu texture
+GLuint		menuTexture;
+GLuint		optionsMenuTexture;
 //Skybox textures
-string		texDir = "Textures/rainb/";
+string		texDir = "Textures/moon/";
 GLuint		skyBoxBack;
 GLuint		skyBoxFront;
 GLuint		skyBoxLeft;
@@ -133,6 +143,12 @@ void setupScene(){
 
 	glutFullScreen();
 
+	//Menu Texture:
+	glGenTextures(1, &menuTexture);
+	textureBMP menuTexture("Textures/mainMenu.bmp", menuTexture);
+	glGenTextures(1, &optionsMenuTexture);
+	textureBMP optionsMenuTexture("Textures/optionsMenu.bmp", optionsMenuTexture);
+
 	//SKYBOX TEXTURES	
 	glGenTextures(1, &skyBoxBack);
 	textureTGA skyBoxBackTexture(texDir+"back.tga", skyBoxBack);
@@ -157,19 +173,20 @@ void updateScene(){
 	while(timeGetTime()-lastTickCount<16);
 	lastTickCount=timeGetTime();
 
-	// Do any other updates here
-	//DISCO
-	if(disco){
-		int	flicker=5;
-		if(lastTickCount % flicker ==0){
-			wireframe=!wireframe;
-			if(wireframe){
-				glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+	if(!inMenu){
+		// Do any other updates here
+		//DISCO
+		if(disco){
+			int	flicker=5;
+			if(lastTickCount % flicker ==0){
+				wireframe=!wireframe;
+				if(wireframe){
+					glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+				}
+				else glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 			}
-			else glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 		}
-	}
-	
+	}	
 	// Draw the next frame
     glutPostRedisplay();
 
@@ -189,14 +206,43 @@ void renderScene(){
 
 	// Set view position & direction
 	camera();
-	
-	glPushMatrix();
-		drawSkyBox();
-		drawBoard();
-		drawPieces(&mainBoard);
-		drawMarker();
-	glPopMatrix();   
- 
+
+	//Draw scene if game state has been entered
+	if(!inMenu){
+		glPushMatrix();
+			drawSkyBox();
+			drawBoard();
+			drawPieces(&mainBoard);
+			drawMarker();
+		glPopMatrix();   
+	}
+	//Otherwise, draw main menu
+	else if(!inOptions){
+		glEnable(GL_TEXTURE_2D);
+		glBindTexture(GL_TEXTURE_2D, menuTexture);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		glBegin(GL_QUADS);
+			glTexCoord2f(1,1);glVertex3f(683, 384, -920);
+			glTexCoord2f(0,1);glVertex3f(-683, 384, -920);
+			glTexCoord2f(0,0);glVertex3f(-683, -384, -920);
+			glTexCoord2f(1,0);glVertex3f(683, -384, -920);
+		glEnd();
+		glDisable(GL_TEXTURE_2D);
+	}
+	else if(inOptions){
+		glEnable(GL_TEXTURE_2D);
+		glBindTexture(GL_TEXTURE_2D, optionsMenuTexture);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		glBegin(GL_QUADS);
+			glTexCoord2f(1,1);glVertex3f(683, 384, -920);
+			glTexCoord2f(0,1);glVertex3f(-683, 384, -920);
+			glTexCoord2f(0,0);glVertex3f(-683, -384, -920);
+			glTexCoord2f(1,0);glVertex3f(683, -384, -920);
+		glEnd();
+		glDisable(GL_TEXTURE_2D);
+	}
     // Swap double buffer for flicker-free animation
     glutSwapBuffers();
 }
@@ -218,14 +264,15 @@ void keypress(unsigned char key, int x, int y){
 	if(key==27){	// ESC(Ascii 27) to exit
 		exitScene();
 	}
-	else if(key == ';'){	// ';' to turn wireframe on/off
+	//else if(key == 'p' && inMenu) inMenu = false;
+	else if(key == ';' && !inMenu){	// ';' to turn wireframe on/off
 		wireframe=!wireframe;
 		if(wireframe){
 			glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 		}
 		else glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 	}
-	else if(key == 'f'){	// 'f' to turn full screen on/off
+	else if(key == 'f' && !inMenu){	// 'f' to turn full screen on/off
 		fullScreen = !fullScreen;
 		if(fullScreen){
 			glutFullScreen();
@@ -235,46 +282,23 @@ void keypress(unsigned char key, int x, int y){
 			glutPositionWindow(50,50);
 		}
 	}
-	else if(key == '.'){
-		disco = !disco;
-		if(disco){
-			PlaySound(L"Sound/BangkokRemix.wav", NULL, SND_ASYNC|SND_FILENAME|SND_LOOP);
-			texDir = "Textures/tron/";
-			glGenTextures(1, &skyBoxBack);
-			textureTGA skyBoxBackTexture(texDir+"back.tga", skyBoxBack);
-			glGenTextures(1, &skyBoxFront);
-			textureTGA skyBoxFrontPlasterTexture(texDir+"front.tga", skyBoxFront);
-			glGenTextures(1, &skyBoxLeft);
-			textureTGA skyBoxLeftTexture(texDir+"left.tga", skyBoxLeft);
-			glGenTextures(1, &skyBoxRight);
-			textureTGA skyBoxRightTexture(texDir+"right.tga", skyBoxRight);
-			glGenTextures(1, &skyBoxTop);
-			textureTGA skyBoxTopTexture(texDir+"top.tga", skyBoxTop);
-			glGenTextures(1, &skyBoxFloor);
-			textureTGA skyBoxFloorTexture(texDir+"bottom.tga", skyBoxFloor);
-		}
-		else{
+	else if(key == '.' && !inMenu){
+		discoSwitch();			
+	}
+	else if(key == 'm' && !inMenu){	// Music
+		if(!disco && !music){
 			PlaySound(L"Sound/OneNightInBangkok.wav", NULL, SND_ASYNC|SND_FILENAME|SND_LOOP);
-			texDir = "Textures/rainb/";
-			glGenTextures(1, &skyBoxBack);
-			textureTGA skyBoxBackTexture(texDir+"back.tga", skyBoxBack);
-			glGenTextures(1, &skyBoxFront);
-			textureTGA skyBoxFrontPlasterTexture(texDir+"front.tga", skyBoxFront);
-			glGenTextures(1, &skyBoxLeft);
-			textureTGA skyBoxLeftTexture(texDir+"left.tga", skyBoxLeft);
-			glGenTextures(1, &skyBoxRight);
-			textureTGA skyBoxRightTexture(texDir+"right.tga", skyBoxRight);
-			glGenTextures(1, &skyBoxTop);
-			textureTGA skyBoxTopTexture(texDir+"top.tga", skyBoxTop);
-			glGenTextures(1, &skyBoxFloor);
-			textureTGA skyBoxFloorTexture(texDir+"bottom.tga", skyBoxFloor);
+			music = true;
 		}
-			
+		else if(!disco && music){
+			PlaySound(NULL, NULL, NULL);
+			music = false;
+		}
 	}
-	else if(key == 'm'){	// Music
-		if(!disco) PlaySound(L"Sound/OneNightInBangkok.wav", NULL, SND_ASYNC|SND_FILENAME|SND_LOOP);
+	else if(key == 'q' && !inMenu){
+		resetGame();
 	}
-	else keyStates[key] = true;	// Otherwise, add to key buffer (for simultaneous keypresses)
+	else if(!inMenu) keyStates[key] = true;	// Otherwise, add to key buffer (for simultaneous keypresses)
 }
 
 void keyReleased(unsigned char key, int x, int y){
@@ -298,9 +322,17 @@ void setViewport(int width, int height) {
 }
 
 void camera(){
-    glRotatef(xrot,1.0,0.0,0.0);  //rotate our camera on the x-axis (left and right)
-    glRotatef(yrot,0.0,1.0,0.0);  //rotate our camera on the y-axis (up and down)
-	glTranslated(-xpos,-viewHeight,-zpos); //translate the screen to the position of our camera
+    if(!inMenu){
+		glRotatef(xrot,1.0,0.0,0.0);  //rotate our camera on the x-axis (left and right)
+		glRotatef(yrot,0.0,1.0,0.0);  //rotate our camera on the y-axis (up and down)
+		glTranslated(-xpos,-viewHeight,-zpos); //translate the screen to the position of our camera
+	}
+	else{
+		//
+		glRotatef(0.0,1.0,0.0,0.0);  //rotate our camera on the x-axis (left and right)
+		glRotatef(0.0,0.0,1.0,0.0);  //rotate our camera on the y-axis (up and down)
+		glTranslated(0,0,0); //translate the screen to the position of our camera
+	}
     //glTranslated(-xpos,-ypos,-zpos); //allows up/down movement
 }
 
@@ -357,8 +389,72 @@ void keyOperations(){
 }
 
 void mouseClicked(int button, int state, int x, int y){
+	//Menu operations:
+	if(inMenu && !inOptions){
+		//Left click down
+		if(button == GLUT_LEFT_BUTTON && state == GLUT_DOWN){
+			if(x >= 930 && x <= 1261 && y>= 158 && y<= 297){
+				//Vs. AI Game
+				//Activate AI
+				//inMenu = false;
+			}
+			else if(x >= 930 && x <= 1261 && y>= 333 && y<= 472){
+				//2 Player Game
+				inMenu = false;
+				cout<<"2"<<endl;
+			}
+			else if(x >= 930 && x <= 1261 && y>= 509 && y<= 650){
+				//Option
+				inOptions = true;
+			}
+		}
+	}
+	else if(inMenu && inOptions){
+		//Options Menu
+		if(button == GLUT_LEFT_BUTTON && state == GLUT_DOWN){
+			cout<<"x: "<<x<<" y: "<<y<<endl;
+			if(x >= 69 && x <= 287 && y>= 166 && y<= 390){
+				//Level 1
+				texDir = "Textures/rainb/";
+			}
+			else if(x >= 348 && x <= 569 && y>= 167 && y<= 389){
+				//Level 2
+				texDir = "Textures/moon/";
+			}
+			else if(x >= 69 && x <= 284 && y>= 423 && y<= 650){
+				//Level 3
+				texDir = "Textures/haunt/";
+			}
+			else if(x >= 347 && x <= 570 && y>= 423 && y<= 650){
+				//Level 4
+				texDir = "Textures/sand/";
+			}
+			else if(x >= 700 && x <= 1312 && y>= 173 && y<= 388){
+				//Pieces 1
+			}
+			else if(x >= 699 && x <= 1311 && y>= 428 && y<= 645){
+				//Pieces 2
+			}
+			else if(x >= 371 && x <= 948 && y>= 670 && y<= 751){
+				//Return to Menu
+				inOptions = false;
+			}
+			glGenTextures(1, &skyBoxBack);
+			textureTGA skyBoxBackTexture(texDir+"back.tga", skyBoxBack);
+			glGenTextures(1, &skyBoxFront);
+			textureTGA skyBoxFrontPlasterTexture(texDir+"front.tga", skyBoxFront);
+			glGenTextures(1, &skyBoxLeft);
+			textureTGA skyBoxLeftTexture(texDir+"left.tga", skyBoxLeft);
+			glGenTextures(1, &skyBoxRight);
+			textureTGA skyBoxRightTexture(texDir+"right.tga", skyBoxRight);
+			glGenTextures(1, &skyBoxTop);
+			textureTGA skyBoxTopTexture(texDir+"top.tga", skyBoxTop);
+			glGenTextures(1, &skyBoxFloor);
+			textureTGA skyBoxFloorTexture(texDir+"bottom.tga", skyBoxFloor);
+		}
+	}
 	//Left-click to select/move piece
-	if(button == GLUT_LEFT_BUTTON && state == GLUT_DOWN) convertMouseCoord(x, y, true);
+	else if(button == GLUT_LEFT_BUTTON && state == GLUT_DOWN) convertMouseCoord(x, y, true);
 	//Right-click to deselect currently selected piece
 	else if(button == GLUT_RIGHT_BUTTON && state == GLUT_DOWN && selected){
 		selected = false;
@@ -370,17 +466,19 @@ void mouseClicked(int button, int state, int x, int y){
 }
 void mouseHover(int x, int y){
 	//Hovering over squares updates position/colour of selection cylinder
-	convertMouseCoord(x, y, false);
+	if(!inMenu) convertMouseCoord(x, y, false);
 }
 void mouseWheeled(int wheel, int direction, int x, int y){
-	//Wheel up/down does same thing as keys 'o' and 'l' (but slower)
-	if(direction == 1){
-		//UP
-		if (xrot-1 > -70) xrot -= 1;
-	}
-	else{
-		//DOWN
-		if (xrot+1 < 70) xrot += 1;
+	if(!inMenu){
+		//Wheel up/down does same thing as keys 'o' and 'l' (but slower)
+		if(direction == 1){
+			//UP
+			if (xrot-1 > -70) xrot -= 1;
+		}
+		else{
+			//DOWN
+			if (xrot+1 < 70) xrot += 1;
+		}
 	}
 }
 
@@ -450,7 +548,6 @@ void updateSelectedPos(float x, float z, bool click){
 		}
 	}
 }
-
 
 /*####################################################################################################*/
 
@@ -706,6 +803,63 @@ void drawMarker(){
 	}
 }
 
+void discoSwitch(){
+	disco = !disco;
+	if(disco){
+		PlaySound(L"Sound/BangkokRemix.wav", NULL, SND_ASYNC|SND_FILENAME|SND_LOOP);
+		string discoTex = "Textures/tron/";
+		glGenTextures(1, &skyBoxBack);
+		textureTGA skyBoxBackTexture(discoTex+"back.tga", skyBoxBack);
+		glGenTextures(1, &skyBoxFront);
+		textureTGA skyBoxFrontPlasterTexture(discoTex+"front.tga", skyBoxFront);
+		glGenTextures(1, &skyBoxLeft);
+		textureTGA skyBoxLeftTexture(discoTex+"left.tga", skyBoxLeft);
+		glGenTextures(1, &skyBoxRight);
+		textureTGA skyBoxRightTexture(discoTex+"right.tga", skyBoxRight);
+		glGenTextures(1, &skyBoxTop);
+		textureTGA skyBoxTopTexture(discoTex+"top.tga", skyBoxTop);
+		glGenTextures(1, &skyBoxFloor);
+		textureTGA skyBoxFloorTexture(discoTex+"bottom.tga", skyBoxFloor);
+	}
+	else{
+		if(music) PlaySound(L"Sound/OneNightInBangkok.wav", NULL, SND_ASYNC|SND_FILENAME|SND_LOOP);
+		else PlaySound(NULL, NULL, NULL);
+		glGenTextures(1, &skyBoxBack);
+		textureTGA skyBoxBackTexture(texDir+"back.tga", skyBoxBack);
+		glGenTextures(1, &skyBoxFront);
+		textureTGA skyBoxFrontPlasterTexture(texDir+"front.tga", skyBoxFront);
+		glGenTextures(1, &skyBoxLeft);
+		textureTGA skyBoxLeftTexture(texDir+"left.tga", skyBoxLeft);
+		glGenTextures(1, &skyBoxRight);
+		textureTGA skyBoxRightTexture(texDir+"right.tga", skyBoxRight);
+		glGenTextures(1, &skyBoxTop);
+		textureTGA skyBoxTopTexture(texDir+"top.tga", skyBoxTop);
+		glGenTextures(1, &skyBoxFloor);
+		textureTGA skyBoxFloorTexture(texDir+"bottom.tga", skyBoxFloor);
+		if(wireframe){
+			glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+			wireframe = false;
+		}
+	}
+}
+
+void resetGame(){
+	//Variables for music etc
+	inMenu = true;
+	music = false;
+	PlaySound(NULL, NULL, NULL);
+	if(disco){
+		discoSwitch();
+	}
+	if(wireframe){
+		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+		wireframe = false;
+	}
+	//Game state
+	mainBoard = board(startXZ, startXZ, squareSize);
+	player = WHITE;
+}
+
 /*####################################################################################################*/
 
 
@@ -715,7 +869,7 @@ void drawMarker(){
 int main(int argc, char** argv){
 
 	//Initialise game board
-	float startXZ = (-boardWidth + boardBorder)+(squareSize/2.0);
+	startXZ = (-boardWidth + boardBorder)+(squareSize/2.0);
 	mainBoard = board(startXZ, startXZ, squareSize);
 
 	// Initialise OpenGL
@@ -742,10 +896,7 @@ int main(int argc, char** argv){
 
     // Setup OpenGL state & scene resources (models, textures etc)
     setupScene();
-
-	//Sound
-	//PlaySound(L"Sound/OneNightInBangkok.wav", NULL, SND_ASYNC|SND_FILENAME|SND_LOOP);
-
+	
     // Show window & start update loop
     glutMainLoop();
 
