@@ -13,7 +13,6 @@ board::board(float startX, float startZ, float squareWidth){
 	//Iterate across board building each square:
 	for(int i=0; i<8; i++){
 		for(int j=0; j<8; j++){
-			//square* x = new square(xPos,zPos,i,j);
 			boardArray[i][j] = new square(xPos,zPos,i,j);
 			zPos += squareWidth;
 		}
@@ -62,7 +61,6 @@ bool board::pieceMoveRules(square from, square to){
 	else{
 		forwards = jDelta < 0;	//WHITE
 		if(forwards) jDelta *= -1;
-		//cout<<jDelta<<endl;
 	}
 
 	//Null move not allowed
@@ -73,7 +71,6 @@ bool board::pieceMoveRules(square from, square to){
 		//Pawns:
 		case BLACK_PAWN:
 		case WHITE_PAWN:
-
 			//Can't move backwards, can't move more than one space
 			if(!forwards) return false;
 
@@ -86,10 +83,7 @@ bool board::pieceMoveRules(square from, square to){
 					if(from.jVal == 6 && boardArray[from.iVal][5]->currentP == EMPTY) return true;	//""
 				}
 			}
-
-			//**If at starting position can move forwards 2**
-			//if(((thisPiece == BLACK_PAWN && from.jVal == 1) || (thisPiece == WHITE_PAWN && from.jVal == 6)) && jDelta == 2 && iDelta == 0 && to.currentP == EMPTY) return checkLineOfSight(from, to);
-			//if(thisPiece == WHITE_PAWN && from.jVal == 6 && jDelta == 2 && iDelta == 0 && to.currentP == EMPTY) return checkLineOfSight(from, to);
+			
 			//Otherwise can only move one space
 			if(jDelta > 1) return false;
 
@@ -104,13 +98,10 @@ bool board::pieceMoveRules(square from, square to){
 		//Rooks:
 		case BLACK_ROOK:
 		case WHITE_ROOK:
-			if(jDelta != 0){
-				//CHECK LINE OF SIGHT
-				return iDelta == 0;	//If moves on the j axis, cannot move on i axis as well
-			}
-			else if(iDelta != 0){
-				//CHECK LINE OF SIGHT
-				return true;
+			if(checkLineOfSight(from, to)){
+				if(jDelta != 0) return iDelta == 0;	//If moves on the j axis, cannot move on i axis as well
+				else if(iDelta != 0) return true;
+				else return false;
 			}
 			else return false;
 			break;
@@ -118,22 +109,20 @@ bool board::pieceMoveRules(square from, square to){
 		//Knights:
 		case BLACK_KNIGHT:
 		case WHITE_KNIGHT:
-			//cout<<"GOT HERE"<<endl;
 			if(jDelta == 1 && (iDelta == 2 || iDelta == -2)) return true;
-			else if((iDelta == 1 || iDelta == -1) && jDelta == 2) return true;
-			
-			else {
-				//cout<<"??? "<<jDelta<<" "<<iDelta<<endl;
-				return false;
-			}
+			else if((iDelta == 1 || iDelta == -1) && jDelta == 2) return true;			
+			else return false;
 			break;
 
 		//Bishops:
 		case BLACK_BISHOP:
 		case WHITE_BISHOP:
-			if(jDelta == iDelta || jDelta == -iDelta){
-				//CHECK LINE OF SIGHT
-				return true;
+			if(checkLineOfSight(from, to)){
+				if(jDelta == iDelta || jDelta == -iDelta){
+					//CHECK LINE OF SIGHT
+					return true;
+				}
+				else return false;
 			}
 			else return false;
 			break;
@@ -141,13 +130,11 @@ bool board::pieceMoveRules(square from, square to){
 		//Queens:
 		case BLACK_QUEEN:
 		case WHITE_QUEEN:
-			if(jDelta == iDelta || jDelta == -iDelta){
-				//CHECK LINE OF SIGHT
-				return true;	//Bishop motion
-			}
-			else if(jDelta != 0){
-				//CHECK LINE OF SIGHT
-				return iDelta == 0;				//Rook motion
+			if(checkLineOfSight(from, to)){
+				if(jDelta == iDelta || jDelta == -iDelta) return true;	//Bishop motion
+				else if(jDelta != 0) return iDelta == 0;				//Rook motion
+				else if(iDelta != 0) return jDelta == 0;				//""
+				else return false;
 			}
 			else return false;
 			break;
@@ -158,30 +145,7 @@ bool board::pieceMoveRules(square from, square to){
 			if(jDelta > 1 || iDelta > 1 || iDelta < -1) return false;
 			else return true;
 			break;
-		
-		//Shouldn't be possible
-		default:
-			return false;
-			break;
 	}
-	//return true;
-}
-
-bool board::checkLineOfSight(square from, square to){
-	int iFrom = from.iVal;
-	int jFrom = from.jVal;
-	int iTo = to.iVal;
-	int jTo = to.jVal;
-
-	if(iTo == iFrom || jTo == jFrom){
-		//Straight line movement, left/right or forward/backward
-		return true;
-	}
-	else if(iTo - iFrom == jTo - jFrom || iFrom - iTo == jTo - jFrom){
-		//diagonal movement
-		return true;
-	}
-	else return false;
 }
 
 bool board::moveMethod(int fromIVal, int fromJVal, int toIVal, int toJVal, playerColour myCol){
@@ -196,17 +160,76 @@ bool board::moveMethod(int fromIVal, int fromJVal, int toIVal, int toJVal, playe
 	else return false;
 }
 
-//Function to move piece across board:
-//void board::movePiece(square *from, square *to){
-//	
-//	//Only move if valid:
-//	if(isValidMove(*from, *to)){
-//		//Perform move
-//		to->currentP = from->currentP;
-//		from->currentP = EMPTY;
-//	}
-//}
+bool board::checkLineOfSight(square from, square to){
+	int iFrom = from.iVal;
+	int jFrom = from.jVal;
+	int iTo = to.iVal;
+	int jTo = to.jVal;
 
+	if(iTo == iFrom || jTo == jFrom){
+		//Straight line movement, left/right or forward/backward
+		if(iTo == iFrom){
+			if(jTo > jFrom){
+				for(int j=jTo-1; j > jFrom; j--) if(boardArray[iTo][j]->currentP != EMPTY) return false;
+				return true;
+			}
+			else if(jTo < jFrom){
+				for(int j=jTo+1; j < jFrom; j++) if(boardArray[iTo][j]->currentP != EMPTY) return false;
+				return true;
+			}
+			else return false;
+		}
+		else if(jTo == jFrom){
+			if(iTo > iFrom){
+				for(int i=iTo-1; i > iFrom; i--) if(boardArray[i][jTo]->currentP != EMPTY) return false;
+				return true;
+			}
+			else if(iTo < iFrom){
+				for(int i=iTo+1; i < iFrom; i++) if(boardArray[i][jTo]->currentP != EMPTY) return false;
+				return true;
+			}
+			else return false;
+		}
+		else return false;
+	}
+	else if(iTo - iFrom == jTo - jFrom || iFrom - iTo == jTo - jFrom){
+		//diagonal movement
+		int iMove, jMove;
+		if(iTo - iFrom > 0) iMove = 1;
+		else iMove = -1;
+		if(jTo - jFrom > 0) jMove = 1;
+		else jMove = -1;
+
+		for(int i=iFrom+iMove, j=jFrom+jMove; i!=iTo && j!= jTo; i+=iMove,j+=jMove){
+			if(boardArray[i][j]->currentP != EMPTY) return false;
+		}
+		return true;
+	}
+	else return false;
+}
+
+int board::checkKings(){
+	bool whiteKing = false;
+	bool blackKing = false;
+
+	//Loop across board, if one king not found, return +/- 1 depending on black/white missing
+	for(int i=0; i<8; i++){
+		for(int j=0; j<8; j++){
+			if(boardArray[i][j]->currentP == BLACK_KING){
+				blackKing = true;
+				if(whiteKing) return 0;
+			}
+			else if(boardArray[i][j]->currentP == WHITE_KING){
+				whiteKing = true;
+				if(blackKing) return 0;
+			}
+		}
+	}
+
+	//If both found, return 0, otherwise +/-1 for black/white
+	if(whiteKing == false) return -1;	//Black wins, -1
+	else return 1;						//White wins, +1
+}
 
 void board::printBoard(){
 	using namespace std;

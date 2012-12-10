@@ -1,18 +1,18 @@
-// chessGameLab5.cpp : Defines the entry point for the console application.
-//
 #include <windows.h>	// for timeGetTime()
 #include <mmsystem.h>	// ditto
 #include <iostream>		// I/O
 #include <GL/freeglut.h>	// GLUT
 
-//#include "model3DS.h" // 3DS model support
+#include "model3DS.h" // 3DS model support
 #include "textureTGA.h" // TGA support
 #include "textureBMP.h"
+
+#include <cstdlib>
+#include<ctime>
 
 #include "board.h"
 
 using namespace std;
-
 
 //Function prototypes:
 /*----------------------------------------------------------------------------------------------------*/
@@ -40,6 +40,8 @@ void drawPieces(board* b);
 void drawMarker();
 void discoSwitch();
 void resetGame();
+void loadModels();
+void aiPlayer();
 
 /*####################################################################################################*/
 
@@ -64,7 +66,8 @@ float	boardY = 0.0;
 float	boardBorder = 5.0;
 int		numSquares = 8;
 float	squareSize = ((boardWidth*2)-(boardBorder*2))/(float)numSquares;
-float	pieceHeight = 2.0;
+float	pieceHeight = 2.0f;
+float	modelHeight = 4.5f;
 
 GLUquadric* cylQuad;
 float	iSquareCentre = NULL;
@@ -79,6 +82,9 @@ bool		wireframe=false;
 bool		fullScreen=true;
 bool		music = false;
 bool		disco = false;
+bool		aiMode = false;
+
+int winRar = 0;
 
 //?
 int         windowId;
@@ -89,6 +95,16 @@ DWORD		lastTickCount;
 GLfloat white_light[] = {1.0, 1.0, 1.0, 1.0};
 GLfloat left_light_position[] = {1,0,-1, 1.0}; 
 GLfloat right_light_position[] = {-1,0,-1, 1.0};
+
+GLfloat emerald_ambient[] = {0.0215, 0.1745, 0.0215},
+	emerald_diffuse[] = {0.07568, 0.61424, 0.07568},
+	emerald_specular[] = {0.633, 0.727811, 0.633},
+	emerald_shininess = 76.8;
+
+GLfloat sapphire_ambient[] = {0.0215, 0.0215, 0.1745},
+	sapphire_diffuse[] = {0.07568, 0.07568, 0.61424},
+	sapphire_specular[] = {0.633, 0.633, 0.727811},
+	sapphire_shininess = 80.0;
 
 //Camera
 float xpos = 0, ypos = 0, zpos = 100, xrot = 15, yrot = 0, angle=0.0;
@@ -106,9 +122,11 @@ int		jHover = -1;
 
 playerColour player = WHITE;
 
-//Menu texture
+//Menu/Win textures
 GLuint		menuTexture;
 GLuint		optionsMenuTexture;
+GLuint		blackWin;
+GLuint		whiteWin;
 //Skybox textures
 string		texDir = "Textures/moon/";
 GLuint		skyBoxBack;
@@ -117,6 +135,26 @@ GLuint		skyBoxLeft;
 GLuint		skyBoxRight;
 GLuint		skyBoxTop;
 GLuint		skyBoxFloor;
+
+//Models:
+bool	loaded = false;
+bool	useModels = false;
+model3DS *whitePawn;
+model3DS *blackPawn;
+model3DS *whiteKing;
+model3DS *blackKing;
+model3DS *whiteQueen;
+model3DS *blackQueen;
+model3DS *whiteBishop;
+model3DS *blackBishop;
+model3DS *whiteKnight;
+model3DS *blackKnight;
+
+model3DS *whiteRookB;
+model3DS *blackRookB;
+model3DS *whiteRookT;
+model3DS *blackRookT;
+float	rookRotate = 0.0f;
 
 /*####################################################################################################*/
 
@@ -143,11 +181,17 @@ void setupScene(){
 
 	glutFullScreen();
 
-	//Menu Texture:
+	//Menu screens:
 	glGenTextures(1, &menuTexture);
 	textureBMP menuTexture("Textures/mainMenu.bmp", menuTexture);
 	glGenTextures(1, &optionsMenuTexture);
 	textureBMP optionsMenuTexture("Textures/optionsMenu.bmp", optionsMenuTexture);
+
+	//Win screens
+	glGenTextures(1, &blackWin);
+	textureBMP blackWin("Textures/blackWinScreen.bmp", blackWin);
+	glGenTextures(1, &whiteWin);
+	textureBMP whiteWin("Textures/whiteWinScreen.bmp", whiteWin);
 
 	//SKYBOX TEXTURES	
 	glGenTextures(1, &skyBoxBack);
@@ -173,7 +217,7 @@ void updateScene(){
 	while(timeGetTime()-lastTickCount<16);
 	lastTickCount=timeGetTime();
 
-	if(!inMenu){
+	if(!inMenu && winRar == 0){
 		// Do any other updates here
 		//DISCO
 		if(disco){
@@ -208,13 +252,32 @@ void renderScene(){
 	camera();
 
 	//Draw scene if game state has been entered
-	if(!inMenu){
+	if(!inMenu && winRar == 0){
 		glPushMatrix();
 			drawSkyBox();
 			drawBoard();
 			drawPieces(&mainBoard);
 			drawMarker();
-		glPopMatrix();   
+		glPopMatrix();
+		if(aiMode && player == BLACK) aiPlayer();
+	}
+	//Otherwise, someone has won, display win screen:
+	else if(!inMenu && winRar != 0){
+		GLuint winTexture;
+		if(winRar == -1) winTexture = blackWin;
+		else winTexture = whiteWin;
+
+		glEnable(GL_TEXTURE_2D);
+		glBindTexture(GL_TEXTURE_2D, winTexture);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		glBegin(GL_QUADS);
+			glTexCoord2f(1,1);glVertex3f(683, 384, -920);
+			glTexCoord2f(0,1);glVertex3f(-683, 384, -920);
+			glTexCoord2f(0,0);glVertex3f(-683, -384, -920);
+			glTexCoord2f(1,0);glVertex3f(683, -384, -920);
+		glEnd();
+		glDisable(GL_TEXTURE_2D);
 	}
 	//Otherwise, draw main menu
 	else if(!inOptions){
@@ -254,7 +317,23 @@ void exitScene(){
     glutDestroyWindow(windowId);
 
     // Free any allocated memory
+	if(loaded){
+		delete whitePawn;
+		delete blackPawn;
+		delete whiteKing;
+		delete blackKing;
+		delete whiteQueen;
+		delete blackQueen;
+		delete whiteBishop;
+		delete blackBishop;
+		delete whiteKnight;
+		delete blackKnight;
+		delete whiteRookT;
+		delete whiteRookB;
+		delete blackRookT;
+		delete blackRookB;
 
+	}
     // Exit program
     exit(0);
 }
@@ -265,14 +344,14 @@ void keypress(unsigned char key, int x, int y){
 		exitScene();
 	}
 	//else if(key == 'p' && inMenu) inMenu = false;
-	else if(key == ';' && !inMenu){	// ';' to turn wireframe on/off
+	else if(key == ';' && !inMenu && winRar == 0){	// ';' to turn wireframe on/off
 		wireframe=!wireframe;
 		if(wireframe){
 			glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 		}
 		else glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 	}
-	else if(key == 'f' && !inMenu){	// 'f' to turn full screen on/off
+	else if(key == 'f' && !inMenu && winRar == 0){	// 'f' to turn full screen on/off
 		fullScreen = !fullScreen;
 		if(fullScreen){
 			glutFullScreen();
@@ -282,23 +361,23 @@ void keypress(unsigned char key, int x, int y){
 			glutPositionWindow(50,50);
 		}
 	}
-	else if(key == '.' && !inMenu){
+	else if(key == '.' && !inMenu && winRar == 0){
 		discoSwitch();			
 	}
-	else if(key == 'm' && !inMenu){	// Music
+	else if(key == 'm' && !inMenu && winRar == 0){	//Music
 		if(!disco && !music){
 			PlaySound(L"Sound/OneNightInBangkok.wav", NULL, SND_ASYNC|SND_FILENAME|SND_LOOP);
 			music = true;
 		}
-		else if(!disco && music){
+		else if(!disco && music){	//Music off
 			PlaySound(NULL, NULL, NULL);
 			music = false;
 		}
 	}
-	else if(key == 'q' && !inMenu){
+	else if(key == 'q' && !inMenu && winRar == 0){
 		resetGame();
 	}
-	else if(!inMenu) keyStates[key] = true;	// Otherwise, add to key buffer (for simultaneous keypresses)
+	else if(!inMenu && winRar == 0) keyStates[key] = true;	//Otherwise, add to key buffer (for simultaneous keypresses)
 }
 
 void keyReleased(unsigned char key, int x, int y){
@@ -306,11 +385,11 @@ void keyReleased(unsigned char key, int x, int y){
 }
 
 void setViewport(int width, int height) {
-    // Work out window ratio, avoid divide-by-zero
+    //Work out window ratio, avoid divide-by-zero
     if(height==0) height=1;
 	float ratio = float(width)/float(height);
 
-	// Reset projection matrix
+	//Reset projection matrix
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
 	
@@ -322,32 +401,29 @@ void setViewport(int width, int height) {
 }
 
 void camera(){
-    if(!inMenu){
-		glRotatef(xrot,1.0,0.0,0.0);  //rotate our camera on the x-axis (left and right)
-		glRotatef(yrot,0.0,1.0,0.0);  //rotate our camera on the y-axis (up and down)
-		glTranslated(-xpos,-viewHeight,-zpos); //translate the screen to the position of our camera
+    if(!inMenu && winRar == 0){
+		//In game, can move camera
+		glRotatef(xrot,1.0,0.0,0.0);			//rotate our camera on the x-axis (left and right)
+		glRotatef(yrot,0.0,1.0,0.0);			//rotate our camera on the y-axis (up and down)
+		glTranslated(-xpos,-viewHeight,-zpos);	//translate the screen to the position of our camera
+		//glTranslated(-xpos,-ypos,-zpos);		//Fly mode
 	}
 	else{
-		//
-		glRotatef(0.0,1.0,0.0,0.0);  //rotate our camera on the x-axis (left and right)
-		glRotatef(0.0,0.0,1.0,0.0);  //rotate our camera on the y-axis (up and down)
-		glTranslated(0,0,0); //translate the screen to the position of our camera
+		//In menu, do not move camera from initial point:
+		glRotatef(0.0,1.0,0.0,0.0);	//rotate our camera on the x-axis (left and right)
+		glRotatef(0.0,0.0,1.0,0.0);	//rotate our camera on the y-axis (up and down)
+		glTranslated(0,0,0);		//translate the screen to the position of our camera
 	}
-    //glTranslated(-xpos,-ypos,-zpos); //allows up/down movement
 }
 
 void keyOperations(){
 	//Tilt upwards
 	if (keyStates['o']){
-		/*xrot -= 1;
-		if (xrot < -360) xrot += 360;*/
-		if (xrot-2 > -70) xrot -= 2;
+		if (xrot-2 > -70) xrot -= 2;	//Limit field of view to +-70 degrees
     }
 	//Tilt Down
 	if (keyStates['l']){
-		/*xrot += 1;
-		if (xrot >360) xrot -= 360;*/
-		if (xrot+2 < 70) xrot += 2;
+		if (xrot+2 < 70) xrot += 2;		// ""
     }
 
 	//FORWARD
@@ -390,17 +466,22 @@ void keyOperations(){
 
 void mouseClicked(int button, int state, int x, int y){
 	//Menu operations:
+	if(winRar != 0 && button == GLUT_LEFT_BUTTON && state == GLUT_DOWN){
+		resetGame();
+	}
 	if(inMenu && !inOptions){
 		//Left click down
 		if(button == GLUT_LEFT_BUTTON && state == GLUT_DOWN){
 			if(x >= 930 && x <= 1261 && y>= 158 && y<= 297){
 				//Vs. AI Game
-				//Activate AI
-				//inMenu = false;
+				//****Activate AI****
+				aiMode = true;
+				inMenu = false;
 			}
 			else if(x >= 930 && x <= 1261 && y>= 333 && y<= 472){
 				//2 Player Game
 				inMenu = false;
+				aiMode = false;
 				cout<<"2"<<endl;
 			}
 			else if(x >= 930 && x <= 1261 && y>= 509 && y<= 650){
@@ -412,7 +493,6 @@ void mouseClicked(int button, int state, int x, int y){
 	else if(inMenu && inOptions){
 		//Options Menu
 		if(button == GLUT_LEFT_BUTTON && state == GLUT_DOWN){
-			cout<<"x: "<<x<<" y: "<<y<<endl;
 			if(x >= 69 && x <= 287 && y>= 166 && y<= 390){
 				//Level 1
 				texDir = "Textures/rainb/";
@@ -431,9 +511,12 @@ void mouseClicked(int button, int state, int x, int y){
 			}
 			else if(x >= 700 && x <= 1312 && y>= 173 && y<= 388){
 				//Pieces 1
+				useModels = false;
 			}
 			else if(x >= 699 && x <= 1311 && y>= 428 && y<= 645){
 				//Pieces 2
+				useModels = true;
+				if(!loaded) loadModels();
 			}
 			else if(x >= 371 && x <= 948 && y>= 670 && y<= 751){
 				//Return to Menu
@@ -466,10 +549,10 @@ void mouseClicked(int button, int state, int x, int y){
 }
 void mouseHover(int x, int y){
 	//Hovering over squares updates position/colour of selection cylinder
-	if(!inMenu) convertMouseCoord(x, y, false);
+	if(!inMenu && winRar == 0) convertMouseCoord(x, y, false);
 }
 void mouseWheeled(int wheel, int direction, int x, int y){
-	if(!inMenu){
+	if(!inMenu && winRar == 0){
 		//Wheel up/down does same thing as keys 'o' and 'l' (but slower)
 		if(direction == 1){
 			//UP
@@ -536,12 +619,15 @@ void updateSelectedPos(float x, float z, bool click){
 			}
 			else if(selected){				
 				if(mainBoard.moveMethod(iSelected, jSelected, iHover, jHover, player)){
+					winRar = mainBoard.checkKings();
 					selected = false;
 					iSelected = NULL;
 					jSelected = NULL;
 					iSelectedCoords = NULL;
 					jSelectedCoords = NULL;
-					if(player == WHITE) player = BLACK;
+					if(player == WHITE){
+						player = BLACK;
+					}
 					else player = WHITE;
 				}				
 			}
@@ -633,8 +719,23 @@ void drawSkyBox(){
 }
 
 void drawBoard(){
-	
-	glColor3f(0.0f,1.0f,1.0f);
+
+	//Enable lighting
+ 	glEnable(GL_LIGHTING);
+
+	//Set the material properties
+	if(texDir != "Textures/rainb/"){
+		glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT, emerald_ambient);
+		glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, emerald_diffuse);
+		glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, emerald_specular);
+		glMaterialf(GL_FRONT_AND_BACK, GL_SHININESS, emerald_shininess);
+	}
+	else{
+		glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT, sapphire_ambient);
+		glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, sapphire_diffuse);
+		glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, sapphire_specular);
+		glMaterialf(GL_FRONT_AND_BACK, GL_SHININESS, sapphire_shininess);
+	}
 	
 	//Base
 	glBegin(GL_QUADS);
@@ -671,13 +772,14 @@ void drawBoard(){
 	glEnd();
 
 	//Top of board:
-	glColor3f(1.0f,0.0f,0.0f);
 	glBegin(GL_QUADS);
 		glVertex3f(boardWidth,(boardY-0.01f),-boardWidth);		//1
 		glVertex3f(-boardWidth,(boardY-0.01f),-boardWidth);		//2
 		glVertex3f(-boardWidth,(boardY-0.01f),boardWidth);		//3
 		glVertex3f(boardWidth,(boardY-0.01f),boardWidth);		//4
 	glEnd();
+
+	glDisable(GL_LIGHTING);
 
 	//Coloured squares:
 	float whiteCol = 1.0;
@@ -706,62 +808,139 @@ void drawBoard(){
 }
 
 void drawPieces(board* b){
+	if(!useModels){
+		for(int i=0; i < 8; i++){
+			for(int j=0; j < 8; j++){
+				square tempSq = *(b->boardArray[j][i]);
+				piece thisP = tempSq.currentP;
+				bool white = false;
 
-	for(int i=0; i < 8; i++){
-		for(int j=0; j < 8; j++){
-			square tempSq = *(b->boardArray[j][i]);
-			piece thisP = tempSq.currentP;
-			bool white = false;
+				//Check if piece is black/white
+				if(thisP < EMPTY) white = true;
 
-			//Check if piece is black/white
-			if(thisP < EMPTY) white = true;
+				//Set colour based on piece colour
+				if(white) glColor3f(0.7f, 0.7f, 0.7f);
+				else glColor3f(0.3f,0.3f,0.3f);
 
-			//Set colour based on piece colour
-			if(white) glColor3f(0.7f, 0.7f, 0.7f);
-			else glColor3f(0.3f,0.3f,0.3f);
-
-			glPushMatrix();
-				glTranslatef(tempSq.centreX, (boardY + pieceHeight), tempSq.centreZ);
-				switch(thisP){
-					case WHITE_KING:
-					case BLACK_KING:
-						glutSolidTeapot(3.0);
-						break;
-					case WHITE_QUEEN:
-					case BLACK_QUEEN:
-						glTranslatef(0.0f, -1.0f, 0.0f);
-						glPushMatrix();
-							glRotatef(-90.0f, 1.0f, 0.0f, 0.0f);
-							glutSolidCone(3.0,4.0,40,40);
-						glPopMatrix();
-						break;
-					case WHITE_BISHOP:
-					case BLACK_BISHOP:
-						glutSolidCube(4.0);
-						break;
-					case WHITE_KNIGHT:
-					case BLACK_KNIGHT:
-						glTranslatef(0.0f, 1.5f, 0.0f);
-						glPushMatrix();
-							glRotatef(-90.0f, 1.0f, 0.0f, 0.0f);
-							glutWireTorus(1.0,2.5,40,40);
-						glPopMatrix();
-						break;
-					case WHITE_ROOK:
-					case BLACK_ROOK:
-						glTranslatef(0.0f, 1.5f, 0.0f);
-						glutSolidTorus(1.0,2.5,40,40);
-						break;
-					case WHITE_PAWN:
-					case BLACK_PAWN:
-						glutSolidSphere(1.25,40,40);
-						break;
-					default:
-						break;
+				glPushMatrix();
+					glTranslatef(tempSq.centreX, (boardY + pieceHeight), tempSq.centreZ);
+					switch(thisP){
+						case WHITE_KING:
+						case BLACK_KING:
+							glutSolidTeapot(3.0);
+							break;
+						case WHITE_QUEEN:
+						case BLACK_QUEEN:
+							glTranslatef(0.0f, -1.0f, 0.0f);
+							glPushMatrix();
+								glRotatef(-90.0f, 1.0f, 0.0f, 0.0f);
+								glutSolidCone(3.0,4.0,40,40);
+							glPopMatrix();
+							break;
+						case WHITE_BISHOP:
+						case BLACK_BISHOP:
+							glutSolidCube(4.0);
+							break;
+						case WHITE_KNIGHT:
+						case BLACK_KNIGHT:
+							glTranslatef(0.0f, 1.5f, 0.0f);
+							glPushMatrix();
+								glRotatef(-90.0f, 1.0f, 0.0f, 0.0f);
+								glutWireTorus(1.0,2.5,40,40);
+							glPopMatrix();
+							break;
+						case WHITE_ROOK:
+						case BLACK_ROOK:
+							glTranslatef(0.0f, 1.5f, 0.0f);
+							glutSolidTorus(1.0,2.5,40,40);
+							break;
+						case WHITE_PAWN:
+						case BLACK_PAWN:
+							glutSolidSphere(1.25,40,40);
+							break;
+						default:
+							break;
 						
-				}
-			glPopMatrix();
-			glColor3f(1.0f,1.0f,1.0f);
+					}
+				glPopMatrix();
+				glColor3f(1.0f,1.0f,1.0f);
+			}
+		}
+	}
+	else{
+		for(int i=0; i < 8; i++){
+			for(int j=0; j < 8; j++){
+				square tempSq = *(b->boardArray[j][i]);
+				piece thisP = tempSq.currentP;
+				
+				glPushMatrix();
+					glTranslatef(tempSq.centreX, (boardY + modelHeight), tempSq.centreZ);
+					glEnable(GL_LIGHTING);
+					switch(thisP){
+						case WHITE_KING:
+							glTranslatef(0.0f, 1.9f, 0.0f);
+							whiteKing->draw();
+							break;
+						case BLACK_KING:
+							glTranslatef(0.0f, 1.9f, 0.0f);
+							blackKing->draw();
+							break;
+						case WHITE_QUEEN:
+							glTranslatef(0.0f, 0.9f, 0.0f);
+							whiteQueen->draw();
+							break;
+						case BLACK_QUEEN:
+							glTranslatef(0.0f, 0.9f, 0.0f);
+							blackQueen->draw();
+							break;
+						case WHITE_BISHOP:
+							glTranslatef(0.0f, 0.9f, 0.0f);
+							whiteBishop->draw();
+							break;
+						case BLACK_BISHOP:
+							glTranslatef(0.0f, 0.9f, 0.0f);
+							blackBishop->draw();
+							break;
+						case WHITE_KNIGHT:
+							glTranslatef(0.0f, 1.1f, 0.0f);
+							whiteKnight->draw();
+							break;
+						case BLACK_KNIGHT:
+							glTranslatef(0.0f, 1.1f, 0.0f);
+							blackKnight->draw();
+							break;
+						case WHITE_ROOK:
+							whiteRookB->draw();
+							glPushMatrix();
+								glTranslatef(0.0f,modelHeight,0.0f);
+								glRotatef(rookRotate, 0.0f, 1.0f, 0.0f);
+								rookRotate += 0.4;
+								whiteRookT->draw();
+							glPopMatrix();
+							break;
+						case BLACK_ROOK:
+							blackRookB->draw();
+							glPushMatrix();
+								glTranslatef(0.0f,modelHeight,0.0f);
+								glRotatef(rookRotate, 0.0f, 1.0f, 0.0f);
+								rookRotate += 0.4;
+								blackRookT->draw();
+							glPopMatrix();
+							break;
+						case WHITE_PAWN:
+							glTranslatef(0.0f,-1.5f,0.0f);
+							whitePawn->draw();
+							break;
+						case BLACK_PAWN:
+							glTranslatef(0.0f,-1.5f,0.0f);
+							blackPawn->draw();
+							break;
+						default:
+							break;						
+					}
+				glDisable(GL_LIGHTING);
+				glPopMatrix();
+			}
 		}
 	}
 }
@@ -857,7 +1036,73 @@ void resetGame(){
 	}
 	//Game state
 	mainBoard = board(startXZ, startXZ, squareSize);
+	winRar = 0;
 	player = WHITE;
+}
+
+void loadModels(){
+	whitePawn = new model3DS("pieces//White Pieces//whitePawn.3DS", 0.15);
+	blackPawn = new model3DS("pieces//Black Pieces//blackPawn.3DS", 0.15);
+
+	whiteKing = new model3DS("pieces//White Pieces//whiteKing.3DS", 0.2);
+	blackKing = new model3DS("pieces//Black Pieces//blackKing.3DS", 0.2);	
+
+	whiteQueen = new model3DS("pieces//White Pieces//whiteQueen.3DS", 0.2);
+	blackQueen = new model3DS("pieces//Black Pieces//blackQueen.3DS", 0.2);
+	
+	whiteBishop = new model3DS("pieces//White Pieces//whiteBishop.3DS", 0.2);
+	blackBishop = new model3DS("pieces//Black Pieces//blackBishop.3DS", 0.2);
+
+	whiteKnight = new model3DS("pieces//White Pieces//whiteKnight.3DS", 0.1);
+	blackKnight = new model3DS("pieces//Black Pieces//blackKnight.3DS", 0.1);
+		
+	whiteRookB = new model3DS("pieces//White Pieces//whiteRookBottom.3DS", 0.2);
+	whiteRookT = new model3DS("pieces//White Pieces//whiteRookTop.3DS", 0.2);
+	blackRookB = new model3DS("pieces//Black Pieces//blackRookBottom.3DS", 0.2);
+	blackRookT = new model3DS("pieces//Black Pieces//blackRookTop.3DS", 0.2);
+
+	loaded = true;
+}
+
+void aiPlayer(){
+	//Generates square to move to, ensures legal move
+	int iFrom=7,jFrom=7,iTo=7,jTo=7;
+	vector<square> aiPieces;
+
+	//Find all black pieces:
+	for(int i=0; i<8; i++){
+		for(int j=0; j<8; j++){
+			if(mainBoard.boardArray[i][j]->currentP > EMPTY) aiPieces.push_back(*mainBoard.boardArray[i][j]);
+		}
+	}
+
+	do{
+		
+		srand((unsigned)time(0));
+		int selectedSquare = rand()%(aiPieces.size()-1);
+		square fromSquare = aiPieces.at(selectedSquare);
+		iFrom = fromSquare.iVal;
+		jFrom = fromSquare.jVal;
+
+		for(int i=0; i<10; i++){
+			if(fromSquare.currentP == BLACK_BISHOP || fromSquare.currentP == BLACK_QUEEN){
+				iTo = rand()%8;
+				jTo = rand()%8;
+				if(mainBoard.isValidMove(*mainBoard.boardArray[iFrom][jFrom], *mainBoard.boardArray[iTo][jTo], BLACK)) break;
+			}
+			else{
+				iTo = rand()%8;
+				jTo = jFrom + 1;
+				if(mainBoard.isValidMove(*mainBoard.boardArray[iFrom][jFrom], *mainBoard.boardArray[iTo][jTo], BLACK)) break;
+			}
+		}
+
+	}while(!mainBoard.isValidMove(*mainBoard.boardArray[iFrom][jFrom], *mainBoard.boardArray[iTo][jTo], BLACK));
+
+	mainBoard.moveMethod(iFrom, jFrom, iTo, jTo, BLACK);
+	player = WHITE;
+
+	winRar = mainBoard.checkKings();
 }
 
 /*####################################################################################################*/

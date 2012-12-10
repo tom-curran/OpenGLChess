@@ -27,6 +27,12 @@
     <ClInclude Include="textureTGA.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="model3DS.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Vector.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="chessGameLab5.cpp">
@@ -39,6 +45,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="textureTGA.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="model3DS.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

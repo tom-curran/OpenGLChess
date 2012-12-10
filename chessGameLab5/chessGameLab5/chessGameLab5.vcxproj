@@ -78,13 +78,16 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="board.h" />
+    <ClInclude Include="model3DS.h" />
     <ClInclude Include="targetver.h" />
     <ClInclude Include="textureBMP.h" />
     <ClInclude Include="textureTGA.h" />
+    <ClInclude Include="Vector.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="board.cpp" />
     <ClCompile Include="chessGameLab5.cpp" />
+    <ClCompile Include="model3DS.cpp" />
     <ClCompile Include="textureBMP.cpp" />
     <ClCompile Include="textureTGA.cpp" />
   </ItemGroup>
